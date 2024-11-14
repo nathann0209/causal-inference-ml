@@ -151,9 +151,9 @@ calculate_MAIPW_per_group <- function(data_sample, data_out_of_sample,
 }
 
 
-# Doubly Robust Estimator
+# Doubly Robust Estimator 
 calculate_DR_per_group <- function(data_sample, data_out_of_sample, 
-                                             propensity_scores, predicted_outcomes_all) {
+                                   propensity_scores, predicted_outcomes_all) {
   
   # Split propensity scores and predicted outcomes
   n_sample <- nrow(data_sample)
@@ -175,23 +175,29 @@ calculate_DR_per_group <- function(data_sample, data_out_of_sample,
     predicted_outcomes_all_group <- c(predicted_outcomes_sample_group, 
                                       predicted_outcomes_all[(n_sample + 1):length(predicted_outcomes_all)][data_out_of_sample$group == group])
     
-    # First term: average of outcome model predictions for both labeled and unlabeled data
-    first_term <- mean(predicted_outcomes_all_group)
+    # Get number of labeled and unlabeled observations in the group
+    n_g <- nrow(sample_group)
+    N_g <- nrow(out_group)
+    
+    # First term: average of outcome model predictions for both labeled and unlabeled data under treatment and control
+    mu_1_dr <- mean(predicted_outcomes_all_group[sample_group$A == 1])
+    mu_0_dr <- mean(predicted_outcomes_all_group[sample_group$A == 0])
     
     # Second term: adjustment using labeled data only
-    second_term <- mean(
-      (sample_group$A / ps_sample_group) * 
-        (sample_group$y - predicted_outcomes_sample_group) -
-        ((1 - sample_group$A) / (1 - ps_sample_group)) * 
-        (sample_group$y - predicted_outcomes_sample_group)
-    )
+    second_term_1 <- mean((sample_group$A / ps_sample_group) * (sample_group$y - predicted_outcomes_sample_group))
+    second_term_0 <- mean(((1 - sample_group$A) / (1 - ps_sample_group)) * (sample_group$y - predicted_outcomes_sample_group))
     
-    # Calculate DR estimator for this group
-    ate_dr_per_group[group] <- first_term + second_term
+    # Calculate mu1_DR and mu0_DR for treatment and control
+    mu1_DR <- (1 / (n_g + N_g)) * sum(mu_1_dr) + (1 / n_g) * second_term_1
+    mu0_DR <- (1 / (n_g + N_g)) * sum(mu_0_dr) + (1 / n_g) * second_term_0
+    
+    # Calculate DR estimator for ATE in this group
+    ate_dr_per_group[group] <- mu1_DR - mu0_DR
   }
   
   return(ate_dr_per_group)
 }
+
 
 
 
